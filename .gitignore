@@ -1,0 +1,51 @@
+# === Node.js Backend (NewBackend) ===
+NewBackend/node_modules/
+NewBackend/.env
+NewBackend/dist/
+NewBackend/build/
+NewBackend/*.log
+NewBackend/npm-debug.log*
+NewBackend/yarn-debug.log*
+NewBackend/yarn-error.log*
+NewBackend/coverage/
+NewBackend/sequelize-meta.json
+NewBackend/*.sqlite
+NewBackend/pids/
+NewBackend/*.pid
+NewBackend/*.pid.lock
+NewBackend/.DS_Store
+
+# === React Frontend (Frontend) ===
+Frontend/node_modules/
+Frontend/.env
+Frontend/.next/
+Frontend/build/
+Frontend/dist/
+Frontend/coverage/
+Frontend/.DS_Store
+
+# === General Logs & Temp Files ===
+logs/
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# === OS/System Files ===
+.DS_Store
+Thumbs.db
+
+# === Docker (if used) ===
+docker-compose.override.yml
+**/Dockerfile.dev
+**/docker-compose.dev.yml
+
+# === IDE/Editor Settings ===
+.vscode/
+.idea/
+
+# === Archives/Packages ===
+*.tgz
+*.zip
