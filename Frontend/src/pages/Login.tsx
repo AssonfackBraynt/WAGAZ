@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
+import { authService } from '@/services/api';
+import LocationSelector from '@/components/LocationSelector';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,9 +16,12 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  // Add persistent login check
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('login');
+
+  // Check if already logged in
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('wagaz-logged-in'));
-  
+
   // Registration fields
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -28,7 +33,8 @@ const Login = () => {
   const [shopName, setShopName] = useState('');
   const [niu, setNiu] = useState('');
   const [location, setLocation] = useState('');
-  const [locationMatches, setLocationMatches] = useState(false);
+  const [locationData, setLocationData] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   // For checking if the whatsapp number should be the same as phone number
   const [sameAsPhone, setSameAsPhone] = useState(false);
@@ -51,146 +57,222 @@ const Login = () => {
     }
   }, [sameAsPhone, phoneNumber]);
 
-  useEffect(() => {
-    // Simulated location matching
-    if (location.toLowerCase() === 'mvan') {
-      setLocationMatches(true);
-    } else {
-      setLocationMatches(false);
-    }
-  }, [location]);
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-
-    // Partner login
-    if (
-      isPartner &&
-      email.trim() === 'ytrewq' &&
-      password === '789456123'
-    ) {
-      setIsLoggedIn(true);
-      // store session
-      localStorage.setItem('wagaz-logged-in', 'true');
-      localStorage.setItem('wagaz-user-type', 'partner');
-      localStorage.setItem('wagaz-user-email', email.trim());
-      navigate('/partner-dashboard', { replace: true });
-      return;
-    }
-
-    // Normal user login
-    if (
-      !isPartner &&
-      email.trim() === 'qwerty' &&
-      password === '123456789'
-    ) {
-      setIsLoggedIn(true);
-      // store session
-      localStorage.setItem('wagaz-logged-in', 'true');
-      localStorage.setItem('wagaz-user-type', 'user');
-      localStorage.setItem('wagaz-user-email', email.trim());
-      navigate('/shop', { replace: true });
-      return;
-    }
-
-    setLoginError('Invalid email or password for selected user type.');
+  const handleLocationSelect = (selectedLocation: { address: string; latitude: number; longitude: number }) => {
+    setLocation(selectedLocation.address);
+    setLocationData({
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude
+    });
   };
 
-  const handleRegistration = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setLoginError('');
+    setIsLoading(true);
+
+    // Console log the login data being sent to backend
+    const loginData = { 
+      email, 
+      password 
+    };
+
+    console.log('=== LOGIN DATA BEING SENT TO BACKEND ===');
+    console.log('Endpoint: POST /auth/login');
+    console.log('Data:', JSON.stringify(loginData, null, 2));
+    console.log('=== END LOGIN DATA ===');
+
+    try {
+      const response = await authService.login(loginData);
+console.log(">>>>>>>>>>>>>>>>>>");
+
+      if (response.success) {
+        console.log('=== LOGIN RESPONSE FROM BACKEND ===');
+        console.log('Response:', JSON.stringify(response, null, 2));
+        console.log('=== END LOGIN RESPONSE ===');
+        
+        localStorage.setItem('wagaz-logged-in', 'true');
+        localStorage.setItem('wagaz-user-type', response.user.userType || 'customer');
+        localStorage.setItem('wagaz-user-email', email);
+
+        console.log('=== LOGIN RESPONSE FROM BACKEND ===');
+        console.log('Response:', JSON.stringify(response, null, 2));
+        console.log('=== END LOGIN RESPONSE ===');
+
+        if (response.token) {
+          localStorage.setItem('auth-token', response.token);
+        }
+
+        setIsLoggedIn(true);
+
+        if (response.user.userType === 'partner') {
+          navigate('/partner-dashboard', { replace: true });
+        } else {
+          navigate('/shop', { replace: true });
+        }
+
+        toast.success('Login successful!');
+      } else {
+        setLoginError(response.message || 'Login failed');
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setLoginError(error.message || 'Invalid email or password');
+      toast.error('Login failed. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsRegistering(true);
+
     // Basic validation
     if (!firstName || !lastName || !regEmail || !regPassword || !phoneNumber) {
-      toast("Please fill out all required fields");
+      toast.error("Please fill out all required fields");
+      setIsRegistering(false);
       return;
     }
 
     if (regPassword !== confirmPassword) {
-      toast("Passwords do not match");
+      toast.error("Passwords do not match");
+      setIsRegistering(false);
       return;
     }
 
     // Set whatsapp number to phone number if not provided
-    const finalWhatsappNumber = whatsappNumber || phoneNumber;
+    const finalWhatsappNumber = phoneNumber || whatsappNumber;
 
     // Partner-specific validation
     if (isPartner) {
-      if (!shopName || !niu || !location) {
-        toast("Please fill out all shop information");
-        return;
-      }
-
-      if (niu !== 'A1234567891234Z') {
-        toast("Invalid NIU/UIN format (should be A1234567891234Z for simulation)");
-        return;
-      }
-
-      if (!locationMatches) {
-        toast("Please enter a valid location (use 'Mvan' for this simulation)");
+      if (!shopName || !niu || !location || !locationData) {
+        toast.error("Please fill out all shop information and select a verified location");
+        setIsRegistering(false);
         return;
       }
     }
 
-    // Success toast
-    toast(`Registration successful! You can now login as ${isPartner ? 'shop partner' : 'user'}`);
-    
-    // Reset form (in a real app, we would redirect to login)
-    setFirstName('');
-    setLastName('');
-    setRegEmail('');
-    setRegPassword('');
-    setConfirmPassword('');
-    setPhoneNumber('');
-    setWhatsappNumber('');
-    setShopName('');
-    setNiu('');
-    setLocation('');
-    setSameAsPhone(false);
+    try {
+      // Fix the userType typing issue
+      const userType: "partner" | "customer" = isPartner ? 'partner' : 'customer';
+
+      const userData = {
+        firstName,
+        lastName,
+        email: regEmail,
+        phone: phoneNumber,
+        whatsappNumber: finalWhatsappNumber,
+        password: regPassword,
+        userType,
+        ...(isPartner && {
+          shopName,
+          niu,
+          location,
+          latitude: locationData?.latitude,
+          longitude: locationData?.longitude
+        })
+      };
+
+      // Console log the registration data being sent to backend
+      console.log('=== REGISTRATION DATA BEING SENT TO BACKEND ===');
+      console.log('Endpoint: POST /auth/register');
+      console.log('User Type:', userType);
+      console.log('Data:', JSON.stringify(userData, null, 2));
+      console.log('=== END REGISTRATION DATA ===');
+
+      const response = await authService.register(userData);
+
+
+      if (response.success) {
+        toast.success(`Registration successful! You can now login as ${isPartner ? 'partner' : 'customer'}`);
+
+        // Reset form
+        setFirstName('');
+        setLastName('');
+        setRegEmail('');
+        setRegPassword('');
+        setConfirmPassword('');
+        setPhoneNumber('');
+        setWhatsappNumber('');
+        setShopName('');
+        setNiu('');
+        setLocation('');
+        setLocationData(null);
+        setSameAsPhone(false);
+        setIsPartner(false);
+      } else {
+        toast.error(response.message || 'Registration failed');
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      // Check if it's a 409 conflict (user already exists)
+      if (error.message && error.message.includes('409')) {
+        toast.error("User already exists with this email. Please try logging in instead.");
+        // Switch to login tab and pre-fill email
+        setActiveTab('login');
+        setEmail(regEmail);
+      } else {
+        toast.error(error.message || 'Registration failed. Please try again.');
+      }
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
-  // To simulate logout in the mock dashboard preview:
-  const handleContinue = () => {
-    setIsLoggedIn(false);
-    setEmail('');
-    setPassword('');
-    setIsPartner(false);
-    localStorage.removeItem('wagaz-logged-in');
-    localStorage.removeItem('wagaz-user-type');
-    localStorage.removeItem('wagaz-user-email');
-    navigate(isPartner ? '/partner-dashboard' : '/shop'); // Always redirect to correct dashboard/shop
+  const handleLogout = async () => {
+    try {
+      // TODO: Call logout API to invalidate session on backend
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear local storage regardless of API call result
+      setIsLoggedIn(false);
+      setEmail('');
+      setPassword('');
+      setIsPartner(false);
+      localStorage.removeItem('wagaz-logged-in');
+      localStorage.removeItem('wagaz-user-type');
+      localStorage.removeItem('wagaz-user-email');
+      localStorage.removeItem('auth-token');
+      navigate('/');
+    }
   };
 
-  // Show mock dashboard after login
+  // Show logged-in state
   if (isLoggedIn) {
+    const userType = localStorage.getItem('wagaz-user-type');
+    const userEmail = localStorage.getItem('wagaz-user-email');
+
     return (
       <div className="container flex items-center justify-center min-h-[80vh] px-4 py-8">
         <div className="w-full max-w-md">
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>
-                Welcome, {isPartner ? 'Shop Partner' : 'WAGAZ User'}!
+                Welcome, {userType === 'partner' ? 'Shop Partner' : 'WAGAZ User'}!
               </CardTitle>
               <CardDescription>
-                You have successfully logged in as <b>{email}</b>
+                You have successfully logged in as <b>{userEmail}</b>
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isPartner ? (
+              {userType === 'partner' ? (
                 <div>
-                  <p className="mb-2">This is a simulation of the partner/shop dashboard.</p>
+                  <p className="mb-2">Access your partner dashboard to manage your shop.</p>
                   <div className="bg-primary/10 rounded p-3 mb-2">
                     <span className="font-semibold">Shop Partner Actions:</span>
                     <ul className="list-disc ml-5 text-sm">
                       <li>View new orders</li>
-                      <li>Manage gas price</li>
+                      <li>Manage inventory</li>
+                      <li>Update prices</li>
                       <li>See delivery requests</li>
                     </ul>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <p className="mb-2">This is a simulation of the normal user's view.</p>
+                  <p className="mb-2">Welcome to WAGAZ! Find gas and petrol services near you.</p>
                   <div className="bg-secondary/60 rounded p-3 mb-2">
                     <span className="font-semibold">User Features:</span>
                     <ul className="list-disc ml-5 text-sm">
@@ -202,15 +284,18 @@ const Login = () => {
                 </div>
               )}
             </CardContent>
-            <CardFooter>
-              <Button className="w-full" variant="secondary" onClick={handleContinue}>
-                Continue to {isPartner ? 'Dashboard' : 'Shop'}
+            <CardFooter className="space-x-2">
+              <Button
+                className="flex-1"
+                onClick={() => navigate(userType === 'partner' ? '/partner-dashboard' : '/shop')}
+              >
+                Continue to {userType === 'partner' ? 'Dashboard' : 'Shop'}
+              </Button>
+              <Button variant="outline" onClick={handleLogout}>
+                Logout
               </Button>
             </CardFooter>
           </Card>
-          <div className="text-center text-muted-foreground text-xs">
-            (This is a simulated login screen for preview purposes.)
-          </div>
         </div>
       </div>
     );
@@ -219,12 +304,12 @@ const Login = () => {
   return (
     <div className="container flex items-center justify-center min-h-[80vh] px-4 py-8">
       <div className="w-full max-w-md">
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid grid-cols-2 mb-6">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="register">Register</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="login">
             <Card>
               <CardHeader>
@@ -240,11 +325,12 @@ const Login = () => {
                       <Label htmlFor="email">Email</Label>
                       <Input
                         id="email"
-                        type="text"
+                        type="email"
                         placeholder="your@email.com"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         autoComplete="username"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
@@ -260,19 +346,8 @@ const Login = () => {
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         autoComplete="current-password"
+                        required
                       />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="is-partner"
-                        className="w-4 h-4 border-border rounded"
-                        checked={isPartner}
-                        onChange={() => setIsPartner(!isPartner)}
-                      />
-                      <Label htmlFor="is-partner" className="text-sm font-normal">
-                        I am a gas shop / petrol station partner
-                      </Label>
                     </div>
                   </div>
                   {loginError && (
@@ -282,14 +357,14 @@ const Login = () => {
                   )}
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full" type="submit">
-                    {isPartner ? 'Partner Login' : 'Login'}
+                  <Button className="w-full" type="submit" disabled={isLoading}>
+                    {isLoading ? 'Logging in...' : 'Login'}
                   </Button>
                 </CardFooter>
               </form>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="register">
             <Card>
               <CardHeader>
@@ -304,8 +379,8 @@ const Login = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="first-name">First name *</Label>
-                        <Input 
-                          id="first-name" 
+                        <Input
+                          id="first-name"
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
                           required
@@ -313,8 +388,8 @@ const Login = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="last-name">Last name *</Label>
-                        <Input 
-                          id="last-name" 
+                        <Input
+                          id="last-name"
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           required
@@ -323,10 +398,10 @@ const Login = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="reg-email">Email *</Label>
-                      <Input 
-                        id="reg-email" 
-                        type="email" 
-                        placeholder="your@email.com" 
+                      <Input
+                        id="reg-email"
+                        type="email"
+                        placeholder="your@email.com"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         required
@@ -334,9 +409,9 @@ const Login = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone-number">Phone Number *</Label>
-                      <Input 
-                        id="phone-number" 
-                        type="tel" 
+                      <Input
+                        id="phone-number"
+                        type="tel"
                         placeholder="e.g. +237 612345678"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
@@ -359,9 +434,9 @@ const Login = () => {
                           </Label>
                         </div>
                       </div>
-                      <Input 
-                        id="whatsapp-number" 
-                        type="tel" 
+                      <Input
+                        id="whatsapp-number"
+                        type="tel"
                         placeholder="e.g. +237 612345678"
                         value={whatsappNumber}
                         onChange={(e) => setWhatsappNumber(e.target.value)}
@@ -370,8 +445,8 @@ const Login = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="reg-password">Password *</Label>
-                      <Input 
-                        id="reg-password" 
+                      <Input
+                        id="reg-password"
                         type="password"
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
@@ -380,8 +455,8 @@ const Login = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="confirm-password">Confirm Password *</Label>
-                      <Input 
-                        id="confirm-password" 
+                      <Input
+                        id="confirm-password"
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -402,14 +477,13 @@ const Login = () => {
                       </Label>
                     </div>
 
-                    {/* Partner fields that appear conditionally */}
                     {isPartner && (
                       <div className="space-y-4 border border-border rounded-md p-4 bg-secondary/20">
                         <h3 className="font-medium">Shop Information</h3>
                         <div className="space-y-2">
                           <Label htmlFor="shop-name">Shop/Station Name *</Label>
-                          <Input 
-                            id="shop-name" 
+                          <Input
+                            id="shop-name"
                             value={shopName}
                             onChange={(e) => setShopName(e.target.value)}
                             required={isPartner}
@@ -417,8 +491,8 @@ const Login = () => {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="niu">NIU/UIN (14 characters) *</Label>
-                          <Input 
-                            id="niu" 
+                          <Input
+                            id="niu"
                             placeholder="A1234567891234Z"
                             value={niu}
                             onChange={(e) => setNiu(e.target.value)}
@@ -426,35 +500,25 @@ const Login = () => {
                           />
                           <p className="text-xs text-muted-foreground">Use A1234567891234Z for simulation</p>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="location">Location *</Label>
-                          <Input 
-                            id="location" 
-                            placeholder="Search for your location"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
-                            required={isPartner}
-                          />
-                          {location && (
-                            <div className={`text-xs ${locationMatches ? 'text-green-600' : 'text-red-500'}`}>
-                              {locationMatches ? '✓ Location found' : 'Location not found. Use "Mvan" for simulation'}
-                            </div>
-                          )}
-                        </div>
+                        <LocationSelector
+                          onLocationSelect={handleLocationSelect}
+                          initialValue={location}
+                          required={isPartner}
+                        />
                       </div>
                     )}
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full" type="submit">
-                    {isPartner ? 'Register as Partner' : 'Register'}
+                  <Button className="w-full" type="submit" disabled={isRegistering}>
+                    {isRegistering ? 'Creating Account...' : (isPartner ? 'Register as Partner' : 'Register')}
                   </Button>
                 </CardFooter>
               </form>
             </Card>
           </TabsContent>
         </Tabs>
-        
+
         <div className="text-center mt-6">
           <p className="text-sm text-muted-foreground">
             By using WAGAZ, you agree to our{' '}

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, MapPin, Store, LogIn, User, LogOut, Package, Settings, LayoutDashboard } from 'lucide-react';
+import { Home, MapPin, Store, LogIn, User, LogOut, Package, Settings, LayoutDashboard, Menu, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,10 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Persistent session from localStorage
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('wagaz-logged-in'));
@@ -37,6 +39,7 @@ const Navbar = () => {
     setIsLoggedIn(!!localStorage.getItem('wagaz-logged-in'));
     setIsPartner(localStorage.getItem('wagaz-user-type') === 'partner');
     setUserEmail(localStorage.getItem('wagaz-user-email'));
+    setIsMobileMenuOpen(false); // Close mobile menu on route change
   }, [location]);
 
   // Remove the auto-login logic for /shop and leave only the partner dashboard auto-login
@@ -71,12 +74,18 @@ const Navbar = () => {
     return location.pathname === path ? 'text-primary font-medium' : 'text-foreground/80 hover:text-primary';
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   return (
-    <header className="sticky top-0 z-10 w-full bg-background/95 backdrop-blur-sm border-b border-border">
+    <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-sm border-b border-border">
       <div className="container flex items-center justify-between h-16 px-4 md:px-6">
         <Link to="/" className="flex items-center gap-2 font-semibold text-lg">
           <span className="text-primary font-bold text-xl">WAGAZ</span>
         </Link>
+        
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
           {isLoggedIn && isPartner ? (
             // Partner sees "Dashboard"
@@ -148,12 +157,123 @@ const Navbar = () => {
             </DropdownMenu>
           )}
         </nav>
-        <button className="block md:hidden">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+
+        {/* Mobile Menu Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={toggleMobileMenu}
+        >
+          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </Button>
       </div>
+
+      {/* Mobile Navigation Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-sm">
+          <nav className="container px-4 py-4 space-y-2">
+            {isLoggedIn && isPartner ? (
+              <Link 
+                to="/partner-dashboard" 
+                className={`flex items-center gap-3 px-3 py-2 rounded-md ${isActive('/partner-dashboard')}`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <LayoutDashboard className="h-5 w-5" />
+                <span>Dashboard</span>
+              </Link>
+            ) : (
+              <Link 
+                to="/" 
+                className={`flex items-center gap-3 px-3 py-2 rounded-md ${isActive('/')}`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Home className="h-5 w-5" />
+                <span>Home</span>
+              </Link>
+            )}
+
+            <Link 
+              to="/shop" 
+              className={`flex items-center gap-3 px-3 py-2 rounded-md ${isActive('/shop')}`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <MapPin className="h-5 w-5" />
+              <span>Shop</span>
+            </Link>
+
+            <Link 
+              to="/partner" 
+              className={`flex items-center gap-3 px-3 py-2 rounded-md ${isActive('/partner')}`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <Store className="h-5 w-5" />
+              <span>Partner</span>
+            </Link>
+
+            {!isLoggedIn ? (
+              <Link 
+                to="/login" 
+                className="flex items-center gap-3 px-3 py-2 rounded-md bg-primary text-primary-foreground"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <LogIn className="h-5 w-5" />
+                <span>Login / Register</span>
+              </Link>
+            ) : (
+              <div className="border-t border-border pt-2 mt-2">
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  Signed in as {userEmail}
+                </div>
+                <Link 
+                  to="/profile" 
+                  className="flex items-center gap-3 px-3 py-2 rounded-md text-foreground/80 hover:text-primary"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <User className="h-5 w-5" />
+                  <span>Profile</span>
+                </Link>
+                <Link 
+                  to="/settings" 
+                  className="flex items-center gap-3 px-3 py-2 rounded-md text-foreground/80 hover:text-primary"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Settings className="h-5 w-5" />
+                  <span>Settings</span>
+                </Link>
+                {isPartner && (
+                  <Link 
+                    to="/inventory" 
+                    className="flex items-center gap-3 px-3 py-2 rounded-md text-foreground/80 hover:text-primary"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <Package className="h-5 w-5" />
+                    <span>Inventory</span>
+                  </Link>
+                )}
+                <Link 
+                  to="/orders" 
+                  className="flex items-center gap-3 px-3 py-2 rounded-md text-foreground/80 hover:text-primary"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <MapPin className="h-5 w-5" />
+                  <span>Orders</span>
+                </Link>
+                <button 
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-3 px-3 py-2 rounded-md text-foreground/80 hover:text-primary w-full text-left"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>Log out</span>
+                </button>
+              </div>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   );
 };

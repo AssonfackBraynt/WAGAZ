@@ -8,64 +8,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import MapPlaceholder from "@/components/MapPlaceholder";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import ShopProductSearchResults from "@/components/ShopProductSearchResults";
 import NewProductDialog from "@/components/NewProductDialog";
-
-const mockShops = [
-  {
-    id: 1,
-    name: "Gas Station Alpha",
-    distance: "0.5 km",
-    type: "petrol",
-    products: [
-      { name: "Gasoil", category: "fuel" },
-      { name: "Super", category: "fuel" },
-      { name: "Engine Oil", category: "oil" }
-    ],
-    bottleMarks: []
-  },
-  {
-    id: 2,
-    name: "Petrol Express",
-    distance: "1.2 km",
-    type: "petrol",
-    products: [
-      { name: "Gasoil", category: "fuel" },
-      { name: "Super", category: "fuel" },
-      { name: "Air", category: "service" }
-    ],
-    bottleMarks: []
-  },
-  {
-    id: 3,
-    name: "Gas Bottle Supply",
-    distance: "0.8 km",
-    type: "gas",
-    bottles: ["12kg", "6kg", "3kg"],
-    bottleMarks: ["Oilibia", "MRS", "Tradex"]
-  },
-  {
-    id: 4,
-    name: "Camgaz Center",
-    distance: "1.5 km",
-    type: "gas",
-    bottles: ["12kg", "6kg", "3kg"],
-    bottleMarks: ["Camgaz", "Tradex"]
-  },
-  {
-    id: 5,
-    name: "MRS Gas Shop",
-    distance: "2.1 km",
-    type: "gas",
-    bottles: ["12kg", "6kg"],
-    bottleMarks: ["MRS", "Oilibia"]
-  },
-];
-
-const initialCustomProducts: any[] = []; // for demo: added by NewProductDialog
+import MapComponent from '@/components/MapComponent';
+import { shopService } from '@/services/api';
 
 const Shop = () => {
   const navigate = useNavigate();
@@ -76,7 +24,9 @@ const Shop = () => {
   const [showLocationPrompt, setShowLocationPrompt] = useState(true);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [customProducts, setCustomProducts] = useState<any[]>(initialCustomProducts);
+  const [customProducts, setCustomProducts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const isAuthenticated = !!localStorage.getItem('wagaz-logged-in');
 
@@ -91,62 +41,77 @@ const Shop = () => {
     // eslint-disable-next-line
   }, [searchType, bottleMark, bottleSize, fuelType]);
 
-  function handleSearch() {
-    let results = [];
-    if (searchType === "gas") {
-      results = mockShops.filter(
-        (shop) =>
-          shop.type === "gas" &&
-          (!bottleMark || shop.bottleMarks?.includes(bottleMark)) &&
-          (!bottleSize || shop.bottles?.includes(bottleSize))
-      );
-    } else {
-      results = mockShops.filter(
-        (shop) =>
-          shop.type === "petrol" &&
-          (!fuelType || shop.products?.some((prod: any) => prod.name.toLowerCase() === fuelType.toLowerCase()))
-      );
-    }
+  async function handleSearch() {
+    setIsLoading(true);
+    try {
+      // TODO: Replace with actual API call using shopService
+      const searchParams = {
+        type: searchType,
+        ...(userLocation && { location: userLocation }),
+        ...(bottleMark && { bottleMark }),
+        ...(bottleSize && { bottleSize }),
+        ...(fuelType && { fuelType }),
+        ...(searchTerm && { searchTerm }),
+      };
 
-    // Search term filter (supports name, category, bottle mark, bottle size)
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      results = results.filter((shop) => {
-        // Search shop name
-        if (shop.name.toLowerCase().includes(term)) return true;
-
-        // Petrol: search name/category in products
-        if (shop.type === "petrol" && shop.products) {
-          if (
-            shop.products.some(
-              (prod: any) =>
-                prod.name.toLowerCase().includes(term) ||
-                prod.category?.toLowerCase().includes(term)
-            )
-          )
-            return true;
-        }
-        // Gas: search in bottle Marks or bottle size
-        if (shop.type === "gas") {
-          if (shop.bottleMarks?.some((mark: string) => mark.toLowerCase().includes(term))) return true;
-          if (shop.bottles?.some((size: string) => size.toLowerCase().includes(term))) return true;
-        }
-        return false;
-      });
+      const results = await shopService.searchShops(searchParams);
+      setSearchResults(results);
+      
+      // TODO: Remove this fallback once API is connected
+      console.log('Search params:', searchParams);
+      toast("Search completed"); // Replace with actual results
+      
+    } catch (error) {
+      console.error('Search failed:', error);
+      toast.error("Failed to search shops. Please try again.");
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
     }
-    setSearchResults(results);
   }
 
   function allowLocation() {
     setShowLocationPrompt(false);
-    setSearchResults(mockShops.filter((shop) => shop.type === searchType));
+    
+    // Get user's current location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setUserLocation(location);
+          
+          // TODO: Fetch nearby shops using the location
+          loadNearbyShops(location);
+        },
+        (error) => {
+          console.error('Location error:', error);
+          toast.error("Could not get your location");
+        }
+      );
+    }
+    
     toast("Location access granted");
+  }
+
+  async function loadNearbyShops(location: { lat: number; lng: number }) {
+    try {
+      // TODO: Replace with actual API call
+      const nearbyShops = await shopService.getNearbyShops(location.lat, location.lng);
+      setSearchResults(nearbyShops.filter((shop: any) => shop.type === searchType));
+    } catch (error) {
+      console.error('Failed to load nearby shops:', error);
+      toast.error("Failed to load nearby shops");
+    }
   }
 
   function handleSelectShop(shop: any) {
     toast(`Selected ${shop.name}`);
     if (isAuthenticated) {
       toast("Proceeding to order form...");
+      // TODO: Navigate to order form or implement order logic
     } else {
       navigate("/login");
     }
@@ -155,14 +120,17 @@ const Shop = () => {
   function handleAddProduct(product: any) {
     setCustomProducts((prev) => [...prev, product]);
     toast("Product added");
+    // TODO: Send new product to backend if needed
   }
 
   return (
     <div className="container px-4 py-8 mx-auto">
+      
       <h1 className="text-3xl font-bold mb-6 flex justify-between items-center">
         Find Gas & Petrol Services
-        <NewProductDialog onAdd={handleAddProduct} />
+        {/* <NewProductDialog onAdd={handleAddProduct} /> */}
       </h1>
+      
       {showLocationPrompt ? (
         <div className="bg-card p-6 rounded-lg shadow-sm mb-8 text-center">
           <h2 className="text-xl font-semibold mb-4">Enable Location Services</h2>
@@ -188,8 +156,8 @@ const Shop = () => {
                       placeholder="Search by name, brand, etc."
                       className="flex-1 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
                     />
-                    <Button onClick={handleSearch} size="sm">
-                      Search
+                    <Button onClick={handleSearch} size="sm" disabled={isLoading}>
+                      {isLoading ? "..." : "Search"}
                     </Button>
                   </div>
                 </div>
@@ -216,6 +184,7 @@ const Shop = () => {
                   </Select>
                 </div>
 
+                
                 {searchType === "gas" ? (
                   <>
                     <div className="space-y-2">
@@ -263,14 +232,14 @@ const Shop = () => {
                   </div>
                 )}
 
-                <Button className="w-full" onClick={handleSearch}>
-                  Search
+                <Button className="w-full" onClick={handleSearch} disabled={isLoading}>
+                  {isLoading ? "Searching..." : "Search"}
                 </Button>
               </div>
             </div>
           </div>
           <div className="md:col-span-2">
-            <MapPlaceholder />
+            <MapComponent />
             <ShopProductSearchResults
               searchResults={searchResults}
               searchType={searchType}

@@ -1,0 +1,62 @@
+here are all our endpoints + format
+POST /api/auth/register
+Content-Type: application/json
+{
+  "first_name": "John",
+  "last_name": "Doe",
+  "email": "john@example.com",
+  "phone": "676123456",
+  "whatsapp_number": "676123456",
+  "password": "test1234",
+  "user_type": "customer"
+}
+
+
+POST /api/auth/login
+Content-Type: application/json
+{
+  "email": "john@example.com",
+  "password": "test1234"
+}
+
+
+//Get nearby shops
+GET /api/shops/nearby?lat=3.848&lng=11.502&radius=2&type=gas
+
+
+get a shop
+GET /api/shops/{shop_id}
+
+
+Create a shop
+POST /api/shops
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Gas Station Alpha",
+  "niu_uin": "ABC12345",
+  "location": "Bonamoussadi, Douala",
+  "latitude": 4.0503,
+  "longitude": 9.7679,
+  "city": "Douala",
+  "region": "Littoral"
+}
+
+
+Add gas bottle
+POST /api/products/gas-bottles
+Authorization: Bearer <token>
+{
+  "shop_id": "shop-id",
+  "name": "Oilibia 12KG",
+  "filled": 8,
+  "total": 10
+}
+
+Update fuel inventory
+PUT /api/products/fuel/:id
+Authorization: Bearer <token>
+{
+  "remaining_liters": 4200
+}

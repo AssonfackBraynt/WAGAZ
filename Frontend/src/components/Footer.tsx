@@ -57,8 +57,8 @@ const Footer = () => {
             <h4 className="font-medium mb-4">Contact</h4>
             <ul className="space-y-2 text-muted-foreground">
               <li>Email: info@wagaz.com</li>
-              <li>Phone: +123 456 7890</li>
-              <li>Address: 123 Energy Street</li>
+              <li>Phone: +237 682463520</li>
+              <li>Address: Carrefour Mvan</li>
             </ul>
           </div>
           <div>
