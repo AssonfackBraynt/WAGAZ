@@ -7,6 +7,7 @@ const API_ENDPOINTS = {
     login: '/auth/login',
     register: '/auth/register',
     logout: '/auth/logout',
+    verifyPassword: '/auth/verify-password',
   },
   // Shop endpoints
   shops: {
@@ -16,14 +17,15 @@ const API_ENDPOINTS = {
   },
   // Gas bottle endpoints
   gasBottles: {
-    getByShop: '/shops/:shopId/gas-bottles',
-    update: '/gas-bottles/:id',
+    getByShop: '/products/gas-bottles/:shopId',
+    update: '/products/gas-bottles/:id',
+    create: '/products/gas-bottles',
   },
   // Shop products endpoints
   shopProducts: {
-    getByShop: '/shops/:shopId/products',
-    update: '/products/:id',
-    create: '/products',
+    getByShop: '/products/shop-products/:shopId',
+    update: '/products/shop-products/:id',
+    create: '/products/shop-products',
   },
   // Fuel inventory endpoints
   fuel: {
@@ -114,11 +116,22 @@ export const gasBottleService = {
     return apiCall(API_ENDPOINTS.gasBottles.getByShop.replace(':shopId', shopId));
   },
 
+  createBottle: async (data: { shop_id: string; name: string; size: string; filled: number; total: number; unitPrice: number; }) => {
+    return apiCall(API_ENDPOINTS.gasBottles.create, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+
   // TODO: Update gas bottle inventory (filled/total counts)
-  updateInventory: async (bottleId: string, filled: number, total: number) => {
+  updateInventory: async (
+    bottleId: string,
+    updates: { filled: number; total: number; unitPrice: number }
+  ) => {
     return apiCall(API_ENDPOINTS.gasBottles.update.replace(':id', bottleId), {
       method: 'PUT',
-      body: JSON.stringify({ filled, total }),
+      body: JSON.stringify(updates),
     });
   },
 };
@@ -139,10 +152,12 @@ export const shopProductService = {
   },
 
   // TODO: Create new product
-  createProduct: async (shopId: string, productData: { name: string; price: number; quantity: number }) => {
+  createProduct: async (data: {shop_id: string; productType: string; variant: string; price: number; quantity: number; image:string }) => {
+    console.log("<<<<<<<<<<<<<<<<<<<>..................");
+    
     return apiCall(API_ENDPOINTS.shopProducts.create, {
       method: 'POST',
-      body: JSON.stringify({ ...productData, shopId }),
+      body: JSON.stringify({ data}),
     });
   },
 };
@@ -204,13 +219,20 @@ export const authService = {
     password: string
   }) => {
     console.log('Login data:++++++++++++++', loginData);
-    
+
     return apiCall(API_ENDPOINTS.auth.login, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify( loginData ),
+      body: JSON.stringify(loginData),
+    });
+  },
+
+  verifyPassword: async (userId: string, password: string) => {
+    return apiCall(API_ENDPOINTS.auth.verifyPassword, {
+      method: 'POST',
+      body: JSON.stringify({ userId, password }),
     });
   },
 

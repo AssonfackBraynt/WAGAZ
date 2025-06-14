@@ -71,32 +71,25 @@ const Login = () => {
     setIsLoading(true);
 
     // Console log the login data being sent to backend
-    const loginData = { 
-      email, 
-      password 
+    const loginData = {
+      email,
+      password
     };
-
-    console.log('=== LOGIN DATA BEING SENT TO BACKEND ===');
-    console.log('Endpoint: POST /auth/login');
-    console.log('Data:', JSON.stringify(loginData, null, 2));
-    console.log('=== END LOGIN DATA ===');
 
     try {
       const response = await authService.login(loginData);
-console.log(">>>>>>>>>>>>>>>>>>");
+      // console.log(">>>>>>>>>>>>>>>>>>");
 
       if (response.success) {
-        console.log('=== LOGIN RESPONSE FROM BACKEND ===');
-        console.log('Response:', JSON.stringify(response, null, 2));
-        console.log('=== END LOGIN RESPONSE ===');
-        
+
         localStorage.setItem('wagaz-logged-in', 'true');
         localStorage.setItem('wagaz-user-type', response.user.userType || 'customer');
         localStorage.setItem('wagaz-user-email', email);
+        localStorage.setItem('userId', response.user.id);
 
-        console.log('=== LOGIN RESPONSE FROM BACKEND ===');
-        console.log('Response:', JSON.stringify(response, null, 2));
-        console.log('=== END LOGIN RESPONSE ===');
+        // console.log('=== LOGIN RESPONSE FROM BACKEND ===');
+        // console.log('Response:', JSON.stringify(response, null, 2));
+        // console.log('=== END LOGIN RESPONSE ===');
 
         if (response.token) {
           localStorage.setItem('auth-token', response.token);
@@ -105,6 +98,7 @@ console.log(">>>>>>>>>>>>>>>>>>");
         setIsLoggedIn(true);
 
         if (response.user.userType === 'partner') {
+          localStorage.setItem('selectedShopId', response.shopId);
           navigate('/partner-dashboard', { replace: true });
         } else {
           navigate('/shop', { replace: true });

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Plus, Upload } from "lucide-react";
 import { getGasImage } from '../utils/getGasImage.js'; // Utility function to get gas bottle image
+import { toast } from "sonner";
+import { convertImageToBase64 } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -16,8 +18,8 @@ import {
 // Gas bottle brands from backend (mock data)
 const gasBottleBrands = [
   "Tradex",
-  "Shell",
-  "Total",
+  "Oil Libya",
+  "Camgaz",
   "SHV Energy",
   "Gazelle",
   "other"
@@ -44,6 +46,8 @@ type NewProductDialogProps = {
   onAdd: (product: {
     name: string;
     category: string;
+    productType?: string;
+    variant?: string;
     amount: number;
     unitPrice: number;
     image?: string;
@@ -80,15 +84,18 @@ const NewProductDialog: React.FC<NewProductDialogProps> = ({ onAdd, businessType
 
   // Function to get automatic image for gas bottles
   const getGasBottleImage = (imagePath: string) => {
-  return getGasImage(imagePath);
-};
+    return getGasImage(imagePath);
+  };
 
-  function handleSubmit(e: React.FormEvent) {
+
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     let finalName = "";
     let finalCategory = "";
     let finalImage = "";
+    let base64Image: string | undefined;
 
     if (businessType === 'gas') {
       const brandName = useCustomName ? customName : name;
@@ -97,21 +104,31 @@ const NewProductDialog: React.FC<NewProductDialogProps> = ({ onAdd, businessType
 
       // Auto-attach image for gas bottles
       if (brandName && bottleSize) {
-  const imagePath = `gasImages/${brandName.toLowerCase()}-${bottleSize}.jpg`;
-  finalImage = imagePath; // store this in DB
-}
-    } else {
-      if (variant && productType) {
-        finalName = `${productType} - ${variant}`;
-      } else {
-        finalName = productType;
+        const imagePath = `gasImages/${brandName.toLowerCase()}-${bottleSize}.jpg`;
+        finalImage = imagePath; // store this in DB
       }
+    } else {
+      console.log("Adding shop product: xxxxxxxxxxxxxxxxxxxxx");
+      
+      if (productImage) {
+        try {
+          base64Image = await convertImageToBase64(productImage);
+        } catch (err) {
+          toast.error("Failed to convert image");
+          return;
+        }
+      }
+
+      finalName = productType;
       finalCategory = category;
+      finalImage = base64Image;
+      console.log("Final image:", finalImage, "Base64:", base64Image, "Product Image:", productImage);
+      
 
       // Use uploaded image for shop products (not fuel)
-      if (category === "shop" && imagePreview) {
-        finalImage = imagePreview;
-      }
+      // if (category === "shop" && imagePreview) {
+      //   finalImage = imagePreview;
+      // }
     }
 
     if (!finalName || !finalCategory) return;
@@ -119,6 +136,8 @@ const NewProductDialog: React.FC<NewProductDialogProps> = ({ onAdd, businessType
     onAdd({
       name: finalName,
       category: finalCategory,
+      productType,
+      variant,
       amount,
       unitPrice,
       image: finalImage || undefined,
@@ -257,14 +276,6 @@ const NewProductDialog: React.FC<NewProductDialogProps> = ({ onAdd, businessType
                         ))}
                       </SelectContent>
                     </Select>
-                    {/* <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowAddBrand(true)}
-                    >
-                      Other
-                    </Button> */}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -289,30 +300,6 @@ const NewProductDialog: React.FC<NewProductDialogProps> = ({ onAdd, businessType
                   </div>
                 )}
 
-                {/* {showAddBrand && (
-                  <div className="mt-2 p-3 border rounded-md bg-muted/50">
-                    <Label htmlFor="new-brand">Add New Brand</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        id="new-brand"
-                        value={newBrand}
-                        onChange={e => setNewBrand(e.target.value)}
-                        placeholder="Enter brand name"
-                      />
-                      <Button type="button" size="sm" onClick={handleAddBrand}>
-                        Add
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowAddBrand(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )} */}
               </div>
 
               <div>
@@ -449,7 +436,7 @@ const NewProductDialog: React.FC<NewProductDialogProps> = ({ onAdd, businessType
                       </div>
                     </div>
                   )}
-                  </div>
+                </div>
               )}
 
               {/* Image upload for shop products only (not fuel) */}

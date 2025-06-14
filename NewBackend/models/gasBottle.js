@@ -35,6 +35,10 @@ module.exports = (sequelize) => {
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    unit_price: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
     updated_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW
@@ -45,7 +49,8 @@ module.exports = (sequelize) => {
     tableName: 'gas_bottles',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    underscored: true
   });
 
   return GasBottle;

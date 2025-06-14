@@ -1,36 +1,99 @@
-const { GasBottle, ShopProduct, FuelInventory } = require('../models');
+const { BottleMark , GasBottle, ShopProduct, FuelInventory } = require('../models');
+const path = require('path');
 
 // ─── Gas Bottles ─────────────────────────────────────────────
 exports.addGasBottle = async (req, res) => {
   try {
-    const { shop_id, brand_id, size, filled, total } = req.body;
+    const { shop_id, name, size, filled, total, unitPrice } = req.body;
 
     if (!['3kg', '6kg', '12kg'].includes(size)) {
       return res.status(400).json({ message: 'Invalid size. Must be 3kg, 6kg, or 12kg.' });
     }
 
-    const bottle = await GasBottle.create({ shop_id, brand_id, size, filled, total });
-    res.status(201).json(bottle);
+    // Look for an existing bottle mark
+    let bottleMark = await BottleMark.findOne({ where: { name, size } });
+
+    // If it doesn't exist, create it
+    if (!bottleMark) {
+      bottleMark = await BottleMark.create({
+        name,
+        size,
+        image: '/assets/gasImages/default.png' // adjust path to the images on the frontend
+      });
+    }
+
+    // Now use the bottleMark id (brand_id) to create the gas bottle
+    const newBottle = await GasBottle.create({ shop_id, brand_id: bottleMark.id, size, filled, total, unit_price: unitPrice });
+    res.status(201).json(newBottle);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to add gas bottle' });
   }
 };
 
+exports.getGasBottlesByShop = async (req, res) => {
+  try {
+    // console.log("yooooooooooooooooooooooo");
+    
+    const { shop_id } = req.params;
+    console.log('shop_id param:', req.params);
+
+    const bottles = await GasBottle.findAll({
+      where: { shop_id },
+      include: [
+        {
+          model: BottleMark,
+          attributes: ['name', 'image', 'size']
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    const formatted = bottles.map(bottle => ({
+      id: bottle.id,
+      name: bottle.BottleMark.name,
+      image: bottle.BottleMark.image,
+      size: bottle.BottleMark.size,
+      filled: bottle.filled,
+      total: bottle.total,
+      unitPrice: bottle.unit_price,
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to retrieve gas bottles' });
+  }
+};
+
+
 exports.updateGasBottle = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
-    const bottle = await GasBottle.findByPk(id);
-    if (!bottle) return res.status(404).json({ message: 'Gas bottle not found' });
+    const { filled, total, unitPrice } = req.body;
 
-    await bottle.update({ ...updates, updated_at: new Date() });
+    console.log(`Updating gas bottle with id: ${id}`, req.body);
+
+    const bottle = await GasBottle.findByPk(id);
+    if (!bottle) {
+      console.log(`Gas bottle with id ${id} not found`);
+      return res.status(404).json({ message: 'Gas bottle not found' });
+    }
+
+    await bottle.update({
+      filled,
+      total,
+      unit_price: unitPrice, // map camelCase to DB column
+      updated_at: new Date(),
+    });
+
     res.json(bottle);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to update gas bottle' });
   }
 };
+
 
 // ─── Shop Products ───────────────────────────────────────────
 exports.addShopProduct = async (req, res) => {
@@ -41,6 +104,19 @@ exports.addShopProduct = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Failed to add product' });
+  }
+};
+
+exports.getShopProductsByShop = async (req, res) => {
+  const { shop_id } = req.params;
+  if (!shop_id) return res.status(400).json({ error: "Missing shop_id" });
+
+  try {
+    const products = await ShopProduct.findAll({ where: { shop_id } });
+    return res.status(200).json(products);
+  } catch (error) {
+    console.error("getShopProductsByShop error:", error);
+    return res.status(500).json({ error: "Failed to fetch products" });
   }
 };
 
@@ -84,19 +160,6 @@ exports.updateFuelInventory = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: 'Failed to update fuel inventory' });
   }
-};
-
-// product listing
-exports.getGasBottlesByShop = async (req, res) => {
-  const { shop_id } = req.query;
-  const bottles = await GasBottle.findAll({ where: { shop_id } });
-  res.json(bottles);
-};
-
-exports.getShopProductsByShop = async (req, res) => {
-  const { shop_id } = req.query;
-  const products = await ShopProduct.findAll({ where: { shop_id } });
-  res.json(products);
 };
 
 exports.getFuelInventoryByShop = async (req, res) => {
