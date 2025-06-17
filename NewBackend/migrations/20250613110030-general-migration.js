@@ -155,7 +155,7 @@ module.exports = {
     await queryInterface.createTable('fuel_inventory', {
       id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
       shop_id: { type: DataTypes.UUID, references: { model: 'shops', key: 'id' }, onDelete: 'CASCADE' },
-      fuel_type: { type: Sequelize.ENUM('super', 'diesel', 'kerosene'), allowNull: false },
+      fuel_type: { type: Sequelize.ENUM('gasoil', 'super', 'diesel', 'Kerosene'), allowNull: false },
       tank_level_percentage: { type: Sequelize.INTEGER, allowNull: true },
       price_per_liter: { type: Sequelize.INTEGER, allowNull: true },
       remaining_liters: { type: Sequelize.INTEGER, allowNull: true },

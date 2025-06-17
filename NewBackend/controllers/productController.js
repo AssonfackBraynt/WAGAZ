@@ -1,4 +1,6 @@
-const { BottleMark , GasBottle, ShopProduct, FuelInventory } = require('../models');
+const { BottleMark, GasBottle, ShopProduct, FuelInventory } = require('../models');
+const db = require('../firebase/firebase');
+const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
 // ─── Gas Bottles ─────────────────────────────────────────────
@@ -34,7 +36,7 @@ exports.addGasBottle = async (req, res) => {
 exports.getGasBottlesByShop = async (req, res) => {
   try {
     // console.log("yooooooooooooooooooooooo");
-    
+
     const { shop_id } = req.params;
     console.log('shop_id param:', req.params);
 
@@ -94,12 +96,37 @@ exports.updateGasBottle = async (req, res) => {
   }
 };
 
-
 // ─── Shop Products ───────────────────────────────────────────
 exports.addShopProduct = async (req, res) => {
   try {
-    const { shop_id, name, price, quantity } = req.body;
-    const product = await ShopProduct.create({ shop_id, name, price, quantity });
+    const { shop_id, category, productType, variant, price, quantity, image } = req.body;
+
+    if (!shop_id || !category || !productType || price == null || quantity == null) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    let imageId = null;
+
+    // Save image in Firestore (base64 or object)
+    if (image != null) {
+      const imageDocRef = await db.collection('product_images').add({
+        imageBase64: image,
+        createdAt: new Date().toISOString(),
+      });
+
+       imageId = imageDocRef.id;
+    }
+
+    const product = await ShopProduct.create({
+      shop_id,
+      category,
+      productType,
+      variant,
+      price,
+      quantity,
+      image: imageId,
+    });
+
     res.status(201).json(product);
   } catch (err) {
     console.error(err);
@@ -113,7 +140,29 @@ exports.getShopProductsByShop = async (req, res) => {
 
   try {
     const products = await ShopProduct.findAll({ where: { shop_id } });
-    return res.status(200).json(products);
+
+    // Fetch Firestore image for each product
+    const enrichedProducts = await Promise.all(products.map(async (product) => {
+      let imageBase64 = null;
+
+      if (product.image) {
+        try {
+          const imageDoc = await db.collection('product_images').doc(product.image).get();
+          if (imageDoc.exists) {
+            imageBase64 = imageDoc.data().imageBase64;
+          }
+        } catch (err) {
+          console.warn(`Could not fetch Firestore image for product ${product.id}:`, err.message);
+        }
+      }
+
+      return {
+        ...product.dataValues,
+        image: imageBase64, // Replace Firestore doc ID with base64 image
+      };
+    }));
+
+    return res.status(200).json(enrichedProducts);
   } catch (error) {
     console.error("getShopProductsByShop error:", error);
     return res.status(500).json({ error: "Failed to fetch products" });
@@ -123,15 +172,35 @@ exports.getShopProductsByShop = async (req, res) => {
 exports.updateShopProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const { price, quantity, imageBase64 } = req.body;
+
     const product = await ShopProduct.findByPk(id);
     if (!product) return res.status(404).json({ message: 'Product not found' });
 
-    await product.update({ ...updates, updated_at: new Date() });
-    res.json(product);
+    let updatedFields = { price, quantity, updated_at: new Date() };
+
+    // Handle Firestore image update
+    if (imageBase64) {
+      try {
+        const newDocId = uuidv4(); // New Firestore doc ID
+        await db.collection('product_images').doc(newDocId).set({ imageBase64 });
+
+        // Optional: delete old image
+        if (product.image) {
+          await db.collection('product_images').doc(product.image).delete().catch(() => { });
+        }
+
+        updatedFields.image = newDocId;
+      } catch (err) {
+        console.error("Failed to update image in Firestore:", err.message);
+      }
+    }
+
+    await product.update(updatedFields);
+    return res.json(product);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Failed to update product' });
+    return res.status(500).json({ message: 'Failed to update product' });
   }
 };
 
@@ -163,9 +232,14 @@ exports.updateFuelInventory = async (req, res) => {
 };
 
 exports.getFuelInventoryByShop = async (req, res) => {
-  const { shop_id } = req.query;
-  const fuel = await FuelInventory.findAll({ where: { shop_id } });
-  res.json(fuel);
+  try {
+    const { shopId } = req.params; // path param
+    const fuel = await FuelInventory.findAll({ where: { shop_id: shopId } });
+    res.json(fuel);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to retrieve fuel inventory' });
+  }
 };
 
 //salesAnalyticsController

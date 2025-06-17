@@ -16,10 +16,11 @@ router.put('/shop-products/:id', auth, productController.updateShopProduct);
 // Fuel Inventory
 router.post('/fuel', auth, productController.addFuelInventory);
 router.put('/fuel/:id', auth, productController.updateFuelInventory);
+router.get('/:shopId/fuel-inventory', auth, productController.getFuelInventoryByShop);
 
 // Retriving products
 // router.get('/gas-bottles', productController.getGasBottlesByShop);
-router.get('/fuel', productController.getFuelInventoryByShop);
+// router.get('/fuel', productController.getFuelInventoryByShop);
 
 
 module.exports = router;
