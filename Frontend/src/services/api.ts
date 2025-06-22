@@ -29,8 +29,8 @@ const API_ENDPOINTS = {
   },
   // Fuel inventory endpoints
   fuel: {
-    getByShop: '/shops/:shopId/fuel-inventory',
-    update: '/fuel-inventory/:id',
+    getByShop: '/products/:shopId/fuel-inventory',
+    update: '/products/fuel/:id',
   },
   // Sales analytics endpoints
   analytics: {
@@ -91,16 +91,24 @@ export const shopService = {
   }) => {
     // TODO: Replace with actual API call
     const queryParams = new URLSearchParams();
+
+    if (searchParams.location) {
+    queryParams.append("lat", searchParams.location.lat.toString());
+    queryParams.append("lng", searchParams.location.lng.toString());
+  }
+
     Object.entries(searchParams).forEach(([key, value]) => {
-      if (value) queryParams.append(key, value.toString());
-    });
+    if (key !== "location" && value) {
+      queryParams.append(key, value.toString());
+    }
+  });
 
     return apiCall(`${API_ENDPOINTS.shops.search}?${queryParams}`);
   },
 
   // TODO: Get shops near user location
-  getNearbyShops: async (lat: number, lng: number, radius: number = 5) => {
-    return apiCall(`${API_ENDPOINTS.shops.getByLocation}?lat=${lat}&lng=${lng}&radius=${radius}`);
+  getNearbyShops: async (lat: number, lng: number, type: 'gas' | 'petrol', radius: number = 5) => {
+    return apiCall(`${API_ENDPOINTS.shops.getByLocation}?lat=${lat}&lng=${lng}&radius=${radius}&type=${type}`);
   },
 
   // TODO: Get shop details by ID
@@ -144,20 +152,20 @@ export const shopProductService = {
   },
 
   // TODO: Update product price and quantity
-  updateProduct: async (productId: string, price: number, quantity: number) => {
+  updateProduct: async (productId: string, price: number, quantity: number, imageBase64?: string) => {
     return apiCall(API_ENDPOINTS.shopProducts.update.replace(':id', productId), {
       method: 'PUT',
-      body: JSON.stringify({ price, quantity }),
+      body: JSON.stringify({ price, quantity, ...(imageBase64 && { imageBase64 }) }),
     });
   },
 
   // TODO: Create new product
-  createProduct: async (data: {shop_id: string; productType: string; variant: string; price: number; quantity: number; image:string }) => {
-    console.log("<<<<<<<<<<<<<<<<<<<>..................");
-    
+  createProduct: async (data: { shop_id: string; category: string, productType: string; variant: string; price: number; quantity: number; image: string }) => {
+    console.log("<<<<<<<<<<<<<<<<<<<>..................", data);
+
     return apiCall(API_ENDPOINTS.shopProducts.create, {
       method: 'POST',
-      body: JSON.stringify({ data}),
+      body: JSON.stringify(data),
     });
   },
 };
@@ -171,10 +179,12 @@ export const fuelService = {
 
   // TODO: Update fuel inventory (tank levels, prices)
   updateFuelInventory: async (fuelId: string, data: {
-    tankLevelPercentage: number;
-    pricePerLiter: number;
-    remainingLiters: number;
+    tank_capacity_liters: number;
+    price_per_liter: number;
+    remaining_liters: number;
   }) => {
+    console.log('Updating fuel inventory with data:', data);
+    
     return apiCall(API_ENDPOINTS.fuel.update.replace(':id', fuelId), {
       method: 'PUT',
       body: JSON.stringify(data),

@@ -126,9 +126,9 @@ const NewProductDialog: React.FC<NewProductDialogProps> = ({ onAdd, businessType
       
 
       // Use uploaded image for shop products (not fuel)
-      // if (category === "shop" && imagePreview) {
-      //   finalImage = imagePreview;
-      // }
+      if (category === "shop" && imagePreview) {
+        finalImage = imagePreview;
+      }
     }
 
     if (!finalName || !finalCategory) return;
@@ -324,11 +324,11 @@ const NewProductDialog: React.FC<NewProductDialogProps> = ({ onAdd, businessType
                 <Label htmlFor="product-category">Category</Label>
                 <Select value={category} onValueChange={setCategory} required>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder="Shop" defaultValue={"shop"}/>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent defaultValue={"shop"}>
                     <SelectItem value="shop">Shop Products</SelectItem>
-                    <SelectItem value="fuel">Fuel/Petrol</SelectItem>
+                    {/* <SelectItem value="fuel">Fuel/Petrol</SelectItem> */}
                   </SelectContent>
                 </Select>
               </div>

@@ -6,6 +6,9 @@ const auth = require('../middleware/auth');
 // Get nearby shops
 router.get('/nearby', shopController.getNearbyShops);
 
+//Search for shops
+router.get('/search', shopController.searchShops);
+
 // Get single shop by ID
 router.get('/:id', shopController.getShopDetails);
 

@@ -54,6 +54,9 @@ const Shop = () => {
         ...(searchTerm && { searchTerm }),
       };
 
+      console.log('Search params:', searchParams);
+      
+
       const results = await shopService.searchShops(searchParams);
       setSearchResults(results);
       
@@ -99,7 +102,7 @@ const Shop = () => {
   async function loadNearbyShops(location: { lat: number; lng: number }) {
     try {
       // TODO: Replace with actual API call
-      const nearbyShops = await shopService.getNearbyShops(location.lat, location.lng);
+      const nearbyShops = await shopService.getNearbyShops(location.lat, location.lng, searchType);
       setSearchResults(nearbyShops.filter((shop: any) => shop.type === searchType));
     } catch (error) {
       console.error('Failed to load nearby shops:', error);

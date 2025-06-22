@@ -23,6 +23,7 @@ import NewProductDialog from '@/components/NewProductDialog';
 const PartnerDashboard = () => {
   const partnerType = localStorage.getItem('wagaz-partner-type') || 'petrol';
   const [businessType, setBusinessType] = useState<'gas' | 'petrol'>(partnerType as 'gas' | 'petrol');
+  const [activeTab, setActiveTab] = useState<'shop' | 'fuel' | 'sales'>('shop');
 
   // State for data from API
   const [gasBottles, setGasBottles] = useState<any[]>([]);
@@ -34,6 +35,8 @@ const PartnerDashboard = () => {
   // UI state
   const [editingItem, setEditingItem] = useState<any>(null);
   const [lastAuthenticated, setLastAuthenticated] = useState<number | null>(null);
+  const [editingFuel, setEditingFuel] = useState<FuelInventory | null>(null);
+
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
@@ -41,7 +44,7 @@ const PartnerDashboard = () => {
   const navigate = useNavigate();
 
   // TODO: Replace with actual shop ID from authenticated user
-  const currentShopId = localStorage.getItem('selected-shop-id');
+  const currentShopId = localStorage.getItem('selectedShopId');
   const currentUserId = localStorage.getItem('userId');
 
   useEffect(() => {
@@ -56,56 +59,66 @@ const PartnerDashboard = () => {
     }
 
     // Load data based on business type
-    loadDashboardData();
-  }, [navigate, businessType]);
+    // loadDashboardData();
+  }, [navigate]);
 
-  async function loadDashboardData() {
-    console.log("🚀 currentShopId:", currentShopId);
-    setIsLoading(true);
-    try {
-      if (businessType === 'gas') {
-        // TODO: Load gas bottle inventory from API
-        console.log("🚀 currentShopId:", currentShopId);
-        const bottles = await gasBottleService.getByShop(currentShopId);
-        console.log("🧪 Gas bottles response:", bottles);
-        setGasBottles(bottles);
-      } else {
-        // TODO: Load petrol station data from API
-        console.log("🚀XXXXXXXXXXXXXXXXXXXXXX currentShopId:", currentShopId);
-        const [products
-          // , fuel
-        ] = await Promise.all([
-          shopProductService.getByShop(currentShopId),
-          // fuelService.getByShop(currentShopId)
-        ]);
-        setShopProducts(products);
-        // setFuelInventory(fuel);
+  useEffect(() => {
+    if (!currentShopId) return;
 
-        console.log("✅ Products:", products);
+    async function loadDashboardData() {
+      console.log("🚀 currentShopId:", currentShopId);
+      setIsLoading(true);
+      try {
+        if (businessType === 'gas') {
+          // TODO: Load gas bottle inventory from API
+          console.log("currentShopId++++++++++:", currentShopId);
+          const bottles = await gasBottleService.getByShop(currentShopId);
+          console.log("🧪 Gas bottles response:", bottles);
+          setGasBottles(bottles);
+        }
+        else if (businessType === 'petrol') {
+          if (activeTab === 'shop') {
+            const products = await shopProductService.getByShop(currentShopId);
+            setShopProducts(products);
+          }
+          else if (activeTab === 'fuel') {
+            const fuel = await fuelService.getByShop(currentShopId);
+            setFuelInventory(fuel);
+            console.log("yooooooooo", fuel);
+
+          }
+          else if (activeTab === 'sales') {
+            const sales = await analyticsService.getSalesData(currentShopId);
+            setSalesData(sales);
+            console.log("yooooooooo", sales);
+          }
+        }
+
+        // TODO: Load sales analytics and wallet data
+        // const [sales, wallet] = await Promise.all([
+        //   analyticsService.getSalesData(currentShopId),
+        //   analyticsService.getWalletData(currentUserId)
+        // ]);
+        // setSalesData(sales);
+        // setWalletData(wallet);
+
+      } catch (error) {
+        console.error(' Dashboard load error:', error.message || error);
+        toast.error("Failed to load dashboard data. Please refresh the page.");
+
+        // TODO: Remove these fallbacks once API is connected
+        setGasBottles([]);
+        setShopProducts([]);
+        setFuelInventory([]);
+        setSalesData({});
+        setWalletData({ balance: 0, transactions: [] });
+      } finally {
+        setIsLoading(false);
       }
-
-      // TODO: Load sales analytics and wallet data
-      // const [sales, wallet] = await Promise.all([
-      //   analyticsService.getSalesData(currentShopId),
-      //   analyticsService.getWalletData(currentUserId)
-      // ]);
-      // setSalesData(sales);
-      // setWalletData(wallet);
-
-    } catch (error) {
-      console.error(' Dashboard load error:', error.message || error);
-      toast.error("Failed to load dashboard data. Please refresh the page.");
-
-      // TODO: Remove these fallbacks once API is connected
-      setGasBottles([]);
-      setShopProducts([]);
-      setFuelInventory([]);
-      setSalesData({});
-      setWalletData({ balance: 0, transactions: [] });
-    } finally {
-      setIsLoading(false);
     }
-  }
+    loadDashboardData();
+  }, [currentShopId, businessType, activeTab]);
+
 
   const needsAuthentication = () => {
     if (!lastAuthenticated) return true;
@@ -172,18 +185,26 @@ const PartnerDashboard = () => {
     }
   };
 
+  //for updating shop products
+  //don't forget add the image in the code and uncomment the image parameter in the function signature and the function call
+  const handleUpdateProduct = async (id: number, price: number, quantity: number, /*image: string*/) => {
+    if (!editingItem || !lastAuthenticated || Date.now() - lastAuthenticated > 10 * 60 * 1000) {
+      setShowPasswordDialog(true);
+      toast("Authentication required. Please verify password again.");
+      // return;
+    } else {
+      setShowEditDialog(true)
+    }
 
-  const handleUpdateProduct = async (id: number, price: number, quantity: number) => {
     try {
-      // TODO: Update shop product via API
-      await shopProductService.updateProduct(id.toString(), price, quantity);
+      await shopProductService.updateProduct(id.toString(), price, quantity, /*image*/);
 
-      // Update local state
       setShopProducts(prev =>
         prev.map(product =>
-          product.id === id ? { ...product, price, quantity } : product
+          product.id === id ? { ...product, price, quantity, /*image*/ } : product
         )
       );
+
       toast("Product updated successfully");
     } catch (error) {
       console.error('Failed to update product:', error);
@@ -191,21 +212,33 @@ const PartnerDashboard = () => {
     }
   };
 
-  const handleUpdateFuelInventory = async (fuelType: string, data: any) => {
-    try {
-      // TODO: Update fuel inventory via API
-      const fuelItem = fuelInventory.find(f => f.fuelType === fuelType);
-      if (fuelItem) {
-        await fuelService.updateFuelInventory(fuelItem.id, data);
+  interface FuelInventory {
+    id: string;
+    fuel_type: string;
+    price_per_liter: number;
+    remaining_liters: number;
+    tank_level_percentage: number;
+    tank_capacity_liters: 0;
+    updated_at?: string;
+  }
 
-        // Update local state
-        setFuelInventory(prev =>
-          prev.map(fuel =>
-            fuel.fuelType === fuelType ? { ...fuel, ...data } : fuel
-          )
-        );
-        toast("Fuel inventory updated successfully");
-      }
+
+  const handleUpdateFuelInventory = async (fuelId: string, data: {
+    price_per_liter: number;
+    remaining_liters: number;
+    tank_capacity_liters: number;
+  }) => {
+    try {
+      await fuelService.updateFuelInventory(fuelId, data);
+
+      // Update local state
+      setFuelInventory(prev =>
+        prev.map(fuel =>
+          fuel.id === fuelId ? { ...fuel, ...data } : fuel
+        )
+      );
+
+      toast("Fuel inventory updated successfully");
     } catch (error) {
       console.error('Failed to update fuel inventory:', error);
       toast.error("Failed to update fuel inventory. Please try again.");
@@ -262,24 +295,26 @@ const PartnerDashboard = () => {
     } else {
       // Add shop product
 
-      const shopId = currentShopId; // make sure you have this in scope
+      const shop_id = currentShopId; // make sure you have this in scope
 
-      if (!shopId) {
+      if (!shop_id) {
         toast.error("Missing shop info");
         return;
       }
-      console.log("Adding shop product:", product);
-      
 
       try {
+        console.log("🚀 currentShopId:", currentShopId);
         const newProduct = await shopProductService.createProduct({
-          shop_id: shopId,
+          shop_id: currentShopId,
+          category: product.category,
           productType: product.productType!,
-          variant: product.variant || "default",
+          variant: product.variant || product.productType!,
           price: product.unitPrice,
           quantity: product.amount,
           image: product.image,
         });
+
+        console.log("Adding shop........... product:", newProduct);
 
         setShopProducts(prev => [...prev, newProduct]);
         toast.success("Product added successfully");
@@ -578,11 +613,11 @@ const PartnerDashboard = () => {
       )}
 
       {businessType === 'petrol' && (
-        <Tabs defaultValue="shop" className="w-full">
+        <Tabs defaultValue={activeTab} className="w-full">
           <TabsList className="mb-4">
-            <TabsTrigger value="shop">Station Shop</TabsTrigger>
-            <TabsTrigger value="fuel">Fuel Inventory</TabsTrigger>
-            <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
+            <TabsTrigger value="shop" onClick={() => setActiveTab('shop')}>Station Shop</TabsTrigger>
+            <TabsTrigger value="fuel" onClick={() => setActiveTab('fuel')}>Fuel Inventory</TabsTrigger>
+            <TabsTrigger value="sales" onClick={() => setActiveTab('sales')}>Sales Analytics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="shop" className="space-y-4">
@@ -602,17 +637,22 @@ const PartnerDashboard = () => {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {shopProducts.map((product) => (
                   <Card key={product.id}>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">{product.name}</CardTitle>
-                      <CardDescription className="text-xs">{product.category}</CardDescription>
+                      <CardTitle className="text-base">{product.variant}</CardTitle>
+                      <CardDescription className="text-xs">{product.productType}</CardDescription>
                     </CardHeader>
                     <CardContent className="pb-2">
-                      {product.image && (
+                      {product.image ? (
                         <div className="w-full h-32 bg-secondary/50 rounded-md flex items-center justify-center mb-3">
-                          <img src={product.image} alt={product.name} className="w-full h-full object-cover rounded-md" />
+                          <img src={product.image.startsWith("data:image") ? product.image : `data:image/png;base64,${product.image}`}
+                            alt={product.variant} className="w-full h-full object-cover rounded-md" />
+                        </div>
+                      ) : (
+                        <div className="w-full h-32 bg-secondary/50 rounded-md flex items-center justify-center mb-3">
+                          No image
                         </div>
                       )}
                       <div className="flex justify-between mb-2">
@@ -639,48 +679,83 @@ const PartnerDashboard = () => {
             <Dialog open={editingItem !== null && 'price' in editingItem}
               onOpenChange={() => setEditingItem(null)}>
               <DialogContent>
-                <DialogHeader>
+                {/* <DialogHeader>
                   <DialogTitle>Edit Product</DialogTitle>
                   <DialogDescription>
                     Update details for {editingItem?.name}
                   </DialogDescription>
+                </DialogHeader> */}
+                <DialogHeader>
+                  <DialogTitle>
+                    {needsAuthentication() ? 'Authentication Required' : 'Edit'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {needsAuthentication()
+                      ? 'Please enter your password to make changes to inventory.'
+                      : `Update stock levels for ${editingItem?.name}`}
+                  </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="product-price">Price (FCFA)</Label>
-                    <Input
-                      id="product-price"
-                      type="number"
-                      defaultValue={editingItem?.price}
-                    />
+
+                {needsAuthentication() ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="auth-password">Password</Label>
+                      <Input id="auth-password" type="password" />
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={async () => {
+                        const passwordInput = document.getElementById('auth-password') as HTMLInputElement;
+                        const isAuthenticated = await handleAuthenticateAndUpdate(passwordInput.value);
+
+                        if (isAuthenticated) {
+                          setLastAuthenticated(Date.now());
+                          setEditingItem({ ...editingItem });
+                          toast.success('Authenticated successfully');
+                        } else {
+                          toast.error('Incorrect password');
+                        }
+                      }}>
+                        Authenticate
+                      </Button>
+                    </DialogFooter>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="product-quantity">Quantity in Stock</Label>
-                    <Input
-                      id="product-quantity"
-                      type="number"
-                      defaultValue={editingItem?.quantity}
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={() => {
-                      if (!editingItem) return;
+                ) : (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="product-price">Price (FCFA)</Label>
+                      <Input
+                        id="product-price"
+                        type="number"
+                        defaultValue={editingItem?.price}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="product-quantity">Quantity in Stock</Label>
+                      <Input
+                        id="product-quantity"
+                        type="number"
+                        defaultValue={editingItem?.quantity}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={() => {
+                        if (!editingItem) return;
 
-                      const priceInput = document.getElementById('product-price') as HTMLInputElement;
-                      const quantityInput = document.getElementById('product-quantity') as HTMLInputElement;
+                        const priceInput = document.getElementById('product-price') as HTMLInputElement;
+                        const quantityInput = document.getElementById('product-quantity') as HTMLInputElement;
 
-                      handleUpdateProduct(
-                        editingItem.id,
-                        parseInt(priceInput.value),
-                        parseInt(quantityInput.value)
-                      );
+                        handleUpdateProduct(
+                          editingItem.id,
+                          parseInt(priceInput.value),
+                          parseInt(quantityInput.value)
+                        );
 
-                      setEditingItem(null);
-                    }}>
-                      Update Product
-                    </Button>
-                  </DialogFooter>
-                </div>
+                        setEditingItem(null);
+                      }}>
+                        Update Product
+                      </Button>
+                    </DialogFooter>
+                  </div>)}
               </DialogContent>
             </Dialog>
           </TabsContent>
@@ -690,7 +765,7 @@ const PartnerDashboard = () => {
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Loading fuel inventory...</p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Connect to backend API to manage fuel inventory
+                  No fuel inventory found
                 </p>
               </div>
             ) : (
@@ -698,7 +773,7 @@ const PartnerDashboard = () => {
                 {fuelInventory.map((fuel) => (
                   <Card key={fuel.id}>
                     <CardHeader>
-                      <CardTitle>{fuel.fuelType}</CardTitle>
+                      <CardTitle>{fuel.fuel_type}</CardTitle>
                       <CardDescription>Current inventory status</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -706,31 +781,104 @@ const PartnerDashboard = () => {
                         <div>
                           <div className="flex justify-between mb-1 text-sm">
                             <span>Tank Level</span>
-                            <span>{fuel.tankLevelPercentage}%</span>
+                            <span>{fuel.tank_level_percentage}%</span>
                           </div>
                           <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-                            <div className="h-full bg-primary" style={{ width: `${fuel.tankLevelPercentage}%` }}></div>
+                            <div className="h-full bg-primary" style={{ width: `${fuel.tank_level_percentage}%` }}></div>
                           </div>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Current Price</span>
-                          <span className="font-bold">{fuel.pricePerLiter} FCFA/L</span>
+                          <span className="font-bold">{fuel.price_per_liter} FCFA/L</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Remaining Volume</span>
-                          <span>{fuel.remainingLiters.toLocaleString()} liters</span>
+                          <span className='flex text-lg'><div className='font-bold'>{fuel.remaining_liters}</div> / {fuel.tank_capacity_liters} liters</span>
                         </div>
                       </div>
                     </CardContent>
                     <CardFooter>
-                      <Button className="w-full" onClick={() => {
-                        toast("Feature coming soon - connect to backend API");
-                      }}>Update Stock & Price</Button>
+                      <Button variant="outline" size="sm" className="w-full" onClick={() => setEditingFuel(fuel)}>
+                        Update Stock & Price</Button>
                     </CardFooter>
                   </Card>
                 ))}
               </div>
             )}
+
+            {/* Edit Dialog */}
+            <Dialog open={editingFuel !== null} onOpenChange={() => setEditingFuel(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {needsAuthentication() ? 'Authentication Required' : 'Edit Fuel'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {needsAuthentication()
+                      ? 'Enter password to modify fuel data.'
+                      : `Update fuel data for ${editingFuel?.fuel_type}`}
+                  </DialogDescription>
+                </DialogHeader>
+
+                {needsAuthentication() ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="auth-password">Password</Label>
+                      <Input id="auth-password" type="password" />
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={async () => {
+                        const input = document.getElementById('auth-password') as HTMLInputElement;
+                        const ok = await handleAuthenticateAndUpdate(input.value);
+
+                        if (ok) {
+                          setLastAuthenticated(Date.now());
+                          toast.success('Authenticated successfully');
+                        } else {
+                          toast.error('Incorrect password');
+                        }
+                      }}>
+                        Authenticate
+                      </Button>
+                    </DialogFooter>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fuel-remaining">Remaining Liters</Label>
+                      <Input id="fuel-remaining" type="number" defaultValue={editingFuel?.remaining_liters} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fuel-price">Price Per Liter (FCFA)</Label>
+                      <Input id="fuel-price" type="number" defaultValue={editingFuel?.price_per_liter} />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="fuel-tank">Total Capacity</Label>
+                      <Input id="fuel-tank-capacity" type="number" defaultValue={editingFuel?.tank_capacity_liters} />
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={() => {
+                        if (!editingFuel) return;
+
+                        const price = parseFloat((document.getElementById('fuel-price') as HTMLInputElement).value);
+                        const remaining = parseFloat((document.getElementById('fuel-remaining') as HTMLInputElement).value);
+                        const capacity = parseFloat((document.getElementById('fuel-tank-capacity') as HTMLInputElement).value);
+
+                        fuelService.updateFuelInventory(editingFuel.id, {
+                          price_per_liter: price,
+                          remaining_liters: remaining,
+                          tank_capacity_liters: capacity
+                        })
+                        // loadDashboardData();
+                      }}>
+                        Update Fuel
+                      </Button>
+                    </DialogFooter>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="sales" className="space-y-4">

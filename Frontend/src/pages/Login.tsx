@@ -34,6 +34,7 @@ const Login = () => {
   const [niu, setNiu] = useState('');
   const [location, setLocation] = useState('');
   const [locationData, setLocationData] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [shopAddress, setShopAddress] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
 
   // For checking if the whatsapp number should be the same as phone number
@@ -56,6 +57,68 @@ const Login = () => {
       setWhatsappNumber(phoneNumber);
     }
   }, [sameAsPhone, phoneNumber]);
+
+  /*---------------------------*/
+  const handleLocateShop = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      return;
+    }
+
+    toast.info("Locating shop...");
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        // Optional: reverse geocode to get address
+        const address = await getAddressFromCoords(latitude, longitude);
+
+        // Call same function as Mapbox/LocationSelector
+        handleLocationSelect({
+          address: address || "Detected via GPS",
+          latitude,
+          longitude,
+        });
+
+        console.log("Shop location captured:", { latitude, longitude, address });
+        setLocationData({ latitude, longitude });
+        setShopAddress(address || "Detected via GPS");
+
+        toast.success("Shop location captured successfully!");
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error("Location permission denied. Please allow location access.");
+        } else {
+          toast.error("Unable to retrieve location. Try again.");
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  };
+
+  const getAddressFromCoords = async (lat: number, lng: number): Promise<string | null> => {
+    const MAPBOX_TOKEN = 'pk.eyJ1IjoiYXNzb25mYWNrMDc2IiwiYSI6ImNtYjJqNm4wNTFjNmgyanF6aGpud3RxNXIifQ.yF3adq05mgzMPUGSztaKJQ';
+    try {
+      const res = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}`
+      );
+      const data = await res.json();
+      return data?.features?.[0]?.place_name || null;
+    } catch (error) {
+      console.error("Reverse geocoding failed:", error);
+      return null;
+    }
+  };
+
+
+  /*---------------------------*/
 
   const handleLocationSelect = (selectedLocation: { address: string; latitude: number; longitude: number }) => {
     setLocation(selectedLocation.address);
@@ -214,23 +277,10 @@ const Login = () => {
   };
 
   const handleLogout = async () => {
-    try {
-      // TODO: Call logout API to invalidate session on backend
-      await authService.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear local storage regardless of API call result
-      setIsLoggedIn(false);
-      setEmail('');
-      setPassword('');
-      setIsPartner(false);
-      localStorage.removeItem('wagaz-logged-in');
-      localStorage.removeItem('wagaz-user-type');
-      localStorage.removeItem('wagaz-user-email');
-      localStorage.removeItem('auth-token');
-      navigate('/');
-    }
+    localStorage.clear(); // ✅ Clear everything stored in localStorage
+    // Optionally, redirect to login or homepage
+    window.location.href = '/login';
+
   };
 
   // Show logged-in state
@@ -494,11 +544,26 @@ const Login = () => {
                           />
                           <p className="text-xs text-muted-foreground">Use A1234567891234Z for simulation</p>
                         </div>
-                        <LocationSelector
+                        {/* <LocationSelector
                           onLocationSelect={handleLocationSelect}
                           initialValue={location}
                           required={isPartner}
-                        />
+                        /> Fussy search not working had to adapt */}
+                        {!shopAddress ? (
+                          <Button
+                            type="button"
+                            variant="default"
+                            className="w-full sm:w-auto mt-2"
+                            onClick={handleLocateShop}
+                          >
+                             Locate Shop
+                          </Button>
+                        ) : (
+                          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
+                            📍 <strong>Location set to:</strong> {shopAddress}
+                          </div>
+                        )}
+
                       </div>
                     )}
                   </div>
