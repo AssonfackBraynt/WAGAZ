@@ -9,7 +9,6 @@ Frontend/.DS_Store
 
 # === Node.js Backend (NewBackend) ===
 NewBackend/node_modules/
-NewBackend/.env
 NewBackend/dist/
 NewBackend/build/
 NewBackend/*.log

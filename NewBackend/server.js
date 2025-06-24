@@ -8,8 +8,6 @@ const PORT = process.env.PORT || 5000;
     await sequelize.authenticate();
     console.log('✅ Database connection established.');
 
-    // Sync DB (dev only; remove in prod and use migrations instead)
-    // await sequelize.sync({ alter: true });
     console.log('📦 Models synchronized.');
 
     app.listen(PORT, () => {
