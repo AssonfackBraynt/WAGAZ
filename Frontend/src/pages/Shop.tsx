@@ -104,6 +104,8 @@ const Shop = () => {
       // TODO: Replace with actual API call
       const nearbyShops = await shopService.getNearbyShops(location.lat, location.lng, searchType);
       setSearchResults(nearbyShops.filter((shop: any) => shop.type === searchType));
+      console.log('Nearby shops:', nearbyShops);
+      
     } catch (error) {
       console.error('Failed to load nearby shops:', error);
       toast.error("Failed to load nearby shops");
@@ -118,12 +120,6 @@ const Shop = () => {
     } else {
       navigate("/login");
     }
-  }
-
-  function handleAddProduct(product: any) {
-    setCustomProducts((prev) => [...prev, product]);
-    toast("Product added");
-    // TODO: Send new product to backend if needed
   }
 
   return (

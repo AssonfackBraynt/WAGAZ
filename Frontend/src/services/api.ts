@@ -1,6 +1,5 @@
 
-// API Service - Replace these base URLs and endpoints with your actual backend
-const API_BASE_URL = 'http://localhost:5000'; // TODO: Replace with your backend URL
+const API_BASE_URL = 'http://192.168.1.78:5000'; // TODO: Replace with your backend URL
 const API_ENDPOINTS = {
   // Authentication endpoints
   auth: {

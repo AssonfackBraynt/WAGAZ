@@ -12,10 +12,12 @@ module.exports = (sequelize) => {
     shop_id: { type: DataTypes.UUID, allowNull: false },
     product_type: DataTypes.ENUM('gas_bottle', 'shop_product', 'fuel'),
     product_id: DataTypes.UUID,
-    units_sold: DataTypes.INTEGER,
+    quantity: DataTypes.INTEGER,
+    total_sales: DataTypes.FLOAT,
     revenue: DataTypes.DECIMAL(10, 2),
-    sale_date: DataTypes.DATEONLY,
-    created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+    date: DataTypes.DATEONLY,
+    created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+    updated_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
   }, {
     sequelize,
     modelName: 'SalesAnalytics',

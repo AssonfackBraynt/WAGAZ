@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -7,10 +6,27 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Search, MapPin } from 'lucide-react';
 
-const MapComponent = () => {
-  const mapContainer = useRef<HTMLDivElement>(null);
+interface Shop {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  type: 'gas' | 'petrol';
+  bottleMark?: string;
+  bottleSize?: string;
+  fuelType?: string;
+}
+
+interface MapComponentProps {
+  searchResults?: Shop[];
+  searchType?: 'gas' | 'petrol';
+}
+
+const MapComponent = ({ searchResults = [], searchType }: MapComponentProps) => {
+  const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const userLocationMarker = useRef<mapboxgl.Marker | null>(null);
+  const shopMarkers = useRef<mapboxgl.Marker[]>([]);
   const [isMapInitialized, setIsMapInitialized] = useState(false);
   const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const [watchId, setWatchId] = useState<number | null>(null);
@@ -41,8 +57,6 @@ const MapComponent = () => {
       console.log("✅ Map loaded successfully");
       setIsMapInitialized(true);
       toast.success("Map loaded successfully!");
-      
-      // Try to get user location automatically after map loads
       tryGetUserLocation();
     });
 
@@ -58,8 +72,47 @@ const MapComponent = () => {
       if (map.current) {
         map.current.remove();
       }
+      shopMarkers.current.forEach(marker => marker.remove());
     };
   }, []);
+
+  useEffect(() => {
+    if (!map.current || !isMapInitialized || !searchResults.length || !searchType) return;
+
+    // Clear existing shop markers
+    shopMarkers.current.forEach(marker => marker.remove());
+    shopMarkers.current = [];
+
+    // Add shop markers (green)
+    searchResults.forEach(shop => {
+      if (shop.lat && shop.lng && !isNaN(shop.lat) && !isNaN(shop.lng)) {
+        const marker = new mapboxgl.Marker({
+          color: '#22c55e', // Green for app shops
+          scale: 1,
+        })
+          .setLngLat([shop.lng, shop.lat])
+          .setPopup(
+            new mapboxgl.Popup().setHTML(
+              `<div><strong>${shop.name}</strong><br/>${
+                searchType === 'gas' ? `${shop.bottleMark || ''} ${shop.bottleSize || ''}` : shop.fuelType || ''
+              }</div>`
+            )
+          )
+          .addTo(map.current!);
+        shopMarkers.current.push(marker);
+      }
+    });
+
+    // Adjust map bounds to include user location and shop markers
+    if (shopMarkers.current.length || userLocation) {
+      const bounds = new mapboxgl.LngLatBounds();
+      shopMarkers.current.forEach(marker => bounds.extend(marker.getLngLat()));
+      if (userLocation) bounds.extend(userLocation);
+      if (!bounds.isEmpty()) {
+        map.current.fitBounds(bounds, { padding: 50, duration: 2000 });
+      }
+    }
+  }, [searchResults, searchType, userLocation, isMapInitialized]);
 
   const addRadiusCircle = (center: [number, number], radiusKm: number = 1) => {
     if (!map.current || !isMapInitialized) {
@@ -67,14 +120,12 @@ const MapComponent = () => {
       return;
     }
 
-    // Ensure map style is loaded before adding sources
     if (!map.current.isStyleLoaded()) {
       map.current.once('styledata', () => addRadiusCircle(center, radiusKm));
       return;
     }
 
     try {
-      // Remove existing circle if it exists
       if (map.current.getLayer('radius-circle')) {
         map.current.removeLayer('radius-circle');
       }
@@ -82,7 +133,6 @@ const MapComponent = () => {
         map.current.removeSource('radius-circle');
       }
 
-      // Create circle around user location
       const circle = {
         type: 'Feature' as const,
         geometry: {
@@ -105,7 +155,7 @@ const MapComponent = () => {
           'circle-radius': {
             stops: [
               [0, 0],
-              [20, radiusKm * 100], // Approximate conversion for visualization
+              [20, radiusKm * 100],
             ],
             base: 2,
           },
@@ -124,50 +174,78 @@ const MapComponent = () => {
   const tryGetUserLocation = () => {
     if (!navigator.geolocation) {
       console.log("Geolocation not supported");
+      toast.error("Geolocation is not supported by this browser.");
+      setLocationPermission('denied');
       return;
     }
 
+    console.log("📍 Requesting initial user location...");
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
         const userCoords: [number, number] = [longitude, latitude];
         setUserLocation(userCoords);
         setLocationPermission('granted');
-        
+
         if (map.current && isMapInitialized) {
+          console.log("📍 Centering map on initial location:", userCoords);
           map.current.flyTo({
             center: userCoords,
             zoom: 15,
-            duration: 2000
+            duration: 2000,
           });
-          
+
           if (userLocationMarker.current) {
             userLocationMarker.current.remove();
           }
           userLocationMarker.current = new mapboxgl.Marker({
             color: '#3b82f6',
-            scale: 1.2
+            scale: 1.2,
           })
             .setLngLat(userCoords)
+            .setPopup(new mapboxgl.Popup().setHTML('<div>Your Location</div>'))
             .addTo(map.current);
 
-          // Add radius circle around user location
           addRadiusCircle(userCoords);
+        } else {
+          console.warn("Map not initialized yet, retrying on map load...");
+          map.current?.on('load', () => {
+            console.log("📍 Retrying center on initial location:", userCoords);
+            map.current?.flyTo({
+              center: userCoords,
+              zoom: 15,
+              duration: 2000,
+            });
+            if (userLocationMarker.current) {
+              userLocationMarker.current.remove();
+            }
+            userLocationMarker.current = new mapboxgl.Marker({
+              color: '#3b82f6',
+              scale: 1.2,
+            })
+              .setLngLat(userCoords)
+              .setPopup(new mapboxgl.Popup().setHTML('<div>Your Location</div>'))
+              .addTo(map.current!);
+            addRadiusCircle(userCoords);
+          });
         }
-        
+
         console.log("📍 Got user location automatically:", latitude, longitude);
         toast.success("Location detected! Map centered on your position.");
       },
       (error) => {
-        console.log("Could not get user location automatically:", error);
+        console.error("Could not get user location automatically:", error);
         if (error.code === error.PERMISSION_DENIED) {
           setLocationPermission('denied');
+          showLocationInstructions();
+        } else {
+          toast.error("Unable to get your location. Please try again.");
         }
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 60000
+        maximumAge: 60000,
       }
     );
   };
@@ -179,38 +257,61 @@ const MapComponent = () => {
     }
 
     setIsSearching(true);
-    
+
     try {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?country=CM&proximity=11.5174,3.8480&access_token=${mapboxgl.accessToken}`
       );
-      
+
       const data = await response.json();
-      
+
       if (data.features && data.features.length > 0) {
         const [longitude, latitude] = data.features[0].center;
         const locationCoords: [number, number] = [longitude, latitude];
-        
-        if (map.current) {
+
+        if (map.current && isMapInitialized) {
+          console.log("📍 Centering map on searched location:", locationCoords);
           map.current.flyTo({
             center: locationCoords,
             zoom: 15,
-            duration: 2000
+            duration: 2000,
           });
-          
+
           if (userLocationMarker.current) {
             userLocationMarker.current.remove();
           }
           userLocationMarker.current = new mapboxgl.Marker({
             color: '#ef4444',
-            scale: 1.2
+            scale: 1.2,
           })
             .setLngLat(locationCoords)
+            .setPopup(new mapboxgl.Popup().setHTML(`<div>${data.features[0].place_name}</div>`))
             .addTo(map.current);
 
           addRadiusCircle(locationCoords);
+        } else {
+          console.warn("Map not initialized for search, retrying on load...");
+          map.current?.on('load', () => {
+            console.log("📍 Retrying center on searched location:", locationCoords);
+            map.current?.flyTo({
+              center: locationCoords,
+              zoom: 15,
+              duration: 2000,
+            });
+            if (userLocationMarker.current) {
+              userLocationMarker.current.remove();
+            }
+            userLocationMarker.current = new mapboxgl.Marker({
+              color: '#ef4444',
+              scale: 1.2,
+            })
+              .setLngLat(locationCoords)
+              .setPopup(new mapboxgl.Popup().setHTML(`<div>${data.features[0].place_name}</div>`))
+              .addTo(map.current!);
+            addRadiusCircle(locationCoords);
+          });
         }
-        
+
         toast.success(`Found: ${data.features[0].place_name}`);
       } else {
         toast.error("Location not found. Try searching for a more specific address in Cameroon.");
@@ -230,7 +331,6 @@ const MapComponent = () => {
       return false;
     }
 
-    // Check if permission is already granted
     if ('permissions' in navigator) {
       try {
         const permission = await navigator.permissions.query({ name: 'geolocation' });
@@ -247,8 +347,7 @@ const MapComponent = () => {
       }
     }
 
-    // Request permission through geolocation API
-    return new Promise((resolve) => {
+    return new Promise<boolean>((resolve) => {
       navigator.geolocation.getCurrentPosition(
         () => {
           setLocationPermission('granted');
@@ -266,7 +365,7 @@ const MapComponent = () => {
         {
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 60000
+          maximumAge: 60000,
         }
       );
     });
@@ -274,20 +373,21 @@ const MapComponent = () => {
 
   const showLocationInstructions = () => {
     const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
     if (isMobile) {
-      toast.error("Location access denied. Please enable location permissions in your browser settings:\n\n" +
-                  "Android: Settings > Apps > [Your Browser] > Permissions > Location\n" +
-                  "iPhone: Settings > Privacy & Security > Location Services > [Your Browser]", {
-        duration: 8000
-      });
+      toast.error(
+        "Location access denied. Please enable location permissions in your browser settings:\n\n" +
+          "Android: Settings > Apps > [Your Browser] > Permissions > Location\n" +
+          "iPhone: Settings > Privacy & Security > Location Services > [Your Browser]",
+        { duration: 8000 }
+      );
     } else {
-      toast.error("Location access denied. Please:\n\n" +
-                  "1. Click the location icon in your browser's address bar\n" +
-                  "2. Select 'Allow' for location access\n" +
-                  "3. Refresh the page", {
-        duration: 6000
-      });
+      toast.error(
+        "Location access denied. Please:\n\n" +
+          "1. Click the location icon in your browser's address bar\n" +
+          "2. Select 'Allow' for location access\n" +
+          "3. Refresh the page",
+        { duration: 6000 }
+      );
     }
   };
 
@@ -298,35 +398,58 @@ const MapComponent = () => {
     const id = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
+        const userCoords: [number, number] = [longitude, latitude];
         console.log('📍 User location update:', latitude, longitude, 'Accuracy:', accuracy);
 
         if (map.current && isMapInitialized) {
+          console.log("📍 Centering map on tracked location:", userCoords);
+          map.current.flyTo({
+            center: userCoords,
+            zoom: 15,
+            duration: 2000,
+          });
+
           if (userLocationMarker.current) {
             userLocationMarker.current.remove();
           }
-
           userLocationMarker.current = new mapboxgl.Marker({
             color: '#3b82f6',
-            scale: 1.2
+            scale: 1.2,
           })
-            .setLngLat([longitude, latitude])
+            .setLngLat(userCoords)
+            .setPopup(new mapboxgl.Popup().setHTML('<div>Your Location</div>'))
             .addTo(map.current);
 
-          if (!userLocation || Math.abs(userLocation[0] - longitude) > 0.001 || Math.abs(userLocation[1] - latitude) > 0.001) {
-            map.current.flyTo({
-              center: [longitude, latitude],
-              zoom: 15,
-              duration: 2000
-            });
-            setUserLocation([longitude, latitude]);
-          }
-
-          addRadiusCircle([longitude, latitude]);
+          addRadiusCircle(userCoords);
 
           if (!isTrackingLocation) {
             setIsTrackingLocation(true);
             toast.success("Location tracking started!");
           }
+
+          setUserLocation(userCoords);
+        } else {
+          console.warn("Map not initialized for tracking, retrying on load...");
+          map.current?.on('load', () => {
+            console.log("📍 Retrying center on tracked location:", userCoords);
+            map.current?.flyTo({
+              center: userCoords,
+              zoom: 15,
+              duration: 2000,
+            });
+            if (userLocationMarker.current) {
+              userLocationMarker.current.remove();
+            }
+            userLocationMarker.current = new mapboxgl.Marker({
+              color: '#3b82f6',
+              scale: 1.2,
+            })
+              .setLngLat(userCoords)
+              .setPopup(new mapboxgl.Popup().setHTML('<div>Your Location</div>'))
+              .addTo(map.current!);
+            addRadiusCircle(userCoords);
+            setUserLocation(userCoords);
+          });
         }
       },
       (error) => {
@@ -344,7 +467,7 @@ const MapComponent = () => {
       {
         enableHighAccuracy: true,
         timeout: 15000,
-        maximumAge: 1000
+        maximumAge: 1000,
       }
     );
 
@@ -372,7 +495,6 @@ const MapComponent = () => {
 
   return (
     <div className="space-y-4">
-      {/* Search Bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -384,11 +506,7 @@ const MapComponent = () => {
             className="pl-10"
           />
         </div>
-        <Button 
-          onClick={searchLocation} 
-          disabled={isSearching}
-          size="default"
-        >
+        <Button onClick={searchLocation} disabled={isSearching} size="default">
           {isSearching ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           ) : (
@@ -397,15 +515,14 @@ const MapComponent = () => {
         </Button>
       </div>
 
-      {/* Location Controls */}
       <div className="flex flex-col sm:flex-row gap-2">
         <Button
           onClick={startLocationTracking}
           disabled={isTrackingLocation}
-          variant={isTrackingLocation ? "secondary" : "default"}
+          variant={isTrackingLocation ? 'secondary' : 'default'}
           className="w-full sm:w-auto"
         >
-          {isTrackingLocation ? "Tracking Location..." : "Use My Current Location"}
+          {isTrackingLocation ? 'Tracking Location...' : 'Use My Current Location'}
         </Button>
         {isTrackingLocation && (
           <Button onClick={stopLocationTracking} variant="outline" className="w-full sm:w-auto">
@@ -413,11 +530,7 @@ const MapComponent = () => {
           </Button>
         )}
         {locationPermission === 'denied' && (
-          <Button
-            onClick={handleEnableLocationClick}
-            variant="outline"
-            className="w-full sm:w-auto"
-          >
+          <Button onClick={handleEnableLocationClick} variant="outline" className="w-full sm:w-auto">
             Enable Location Access
           </Button>
         )}
@@ -435,7 +548,7 @@ const MapComponent = () => {
       )}
 
       <div className="text-xs text-muted-foreground text-center">
-        📍 Blue circle shows ~1km radius around your location
+        📍 Blue: Your location | Green: App shops
       </div>
     </div>
   );
