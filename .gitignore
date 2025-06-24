@@ -1,3 +1,12 @@
+# === React Frontend (Frontend) ===
+Frontend/node_modules/
+Frontend/.env
+Frontend/.next/
+Frontend/build/
+Frontend/dist/
+Frontend/coverage/
+Frontend/.DS_Store
+
 # === Node.js Backend (NewBackend) ===
 NewBackend/node_modules/
 NewBackend/.env
@@ -15,14 +24,6 @@ NewBackend/*.pid
 NewBackend/*.pid.lock
 NewBackend/.DS_Store
 
-# === React Frontend (Frontend) ===
-Frontend/node_modules/
-Frontend/.env
-Frontend/.next/
-Frontend/build/
-Frontend/dist/
-Frontend/coverage/
-Frontend/.DS_Store
 
 # === General Logs & Temp Files ===
 logs/
