@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://93.127.162.162:5000';
+const API_BASE_URL = 'https://93.127.162.162:5000/api';
 
 const API_ENDPOINTS = {
   // Authentication endpoints

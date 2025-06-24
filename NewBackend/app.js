@@ -14,9 +14,9 @@ app.get('/api/ping', (req, res) => {
 });
 
 // Routes (to be added later)
-app.use('/auth', require('./routes/authRoutes'));
-app.use('/shops', require('./routes/shopRoutes'));
-app.use('/orders', require('./routes/orderRoutes'));
-app.use('/products', require('./routes/productRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/shops', require('./routes/shopRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/products', require('./routes/productRoutes'));
 
 module.exports = app;
