@@ -6,7 +6,7 @@ services:
       context: ./Frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3100:3000"
     restart: unless-stopped
 
   backend:
@@ -34,7 +34,7 @@ services:
     volumes:
       - wagaz_postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5543:5432"
 
 
 volumes:
