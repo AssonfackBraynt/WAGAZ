@@ -14,7 +14,7 @@ services:
       context: ./NewBackend
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "5500:5000"
     env_file:
       - ./NewBackend/.env
     depends_on:
