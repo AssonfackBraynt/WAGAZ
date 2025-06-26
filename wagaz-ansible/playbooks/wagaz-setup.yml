@@ -1,0 +1,38 @@
+---
+- name: Setup Wagaz App on VPS
+  hosts: local
+  become: yes
+  tasks:
+
+    - name: Ensure Docker is installed
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker Compose is installed
+      apt:
+        name: docker-compose
+        state: present
+
+    - name: Ensure Node.js is installed
+      apt:
+        name: nodejs
+        state: present
+
+    - name: Ensure npm is installed
+      apt:
+        name: npm
+        state: present
+
+    - name: Clone Wagaz repo if not already cloned
+      git:
+        repo: 'https://github.com/AssonfackBraynt/WAGAZ.git'
+        dest: /var/www/WAGAZ
+        version: main
+        force: yes
+
+    - name: Run docker-compose up
+      command: docker compose up -d
+      args:
+        chdir: /var/www/WAGAZ
