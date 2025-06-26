@@ -7,7 +7,7 @@ pipeline {
         git branch: 'main', url: 'https://github.com/AssonfackBraynt/WAGAZ.git'
       }
     }
-
+//jenkinsfile
     stage('Rebuild Containers') {
       steps {
         sh 'docker-compose down'
